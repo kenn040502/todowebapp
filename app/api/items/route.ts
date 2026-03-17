@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import { Item } from "@/models/Item";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   await connectDB();
   const items = await Item.find().sort({ createdAt: -1 }).limit(50);
