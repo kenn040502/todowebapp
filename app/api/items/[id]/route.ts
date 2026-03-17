@@ -4,9 +4,10 @@ import { Item } from "@/models/Item";
 
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   await connectDB();
-  await Item.findByIdAndDelete(params.id);
+  await Item.findByIdAndDelete(id);
   return NextResponse.json({ success: true });
 }
