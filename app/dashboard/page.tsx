@@ -21,6 +21,14 @@ import {
   X,
   CheckSquare,
   Square,
+  Search,
+  Mail,
+  KeyRound,
+  UserCircle2,
+  Info,
+  Palette,
+  BellOff,
+  Eraser,
 } from "lucide-react";
 
 import { Button }   from "@/components/ui/button";
@@ -42,11 +50,13 @@ interface Item {
   done?: boolean;
 }
 
-const NAV_ITEMS = [
-  { label: "Today",    icon: LayoutDashboard, active: true  },
-  { label: "All",      icon: List                           },
-  { label: "Account",  icon: Users                          },
-  { label: "Settings", icon: Settings                       },
+type Page = "Today" | "All" | "Account" | "Settings";
+
+const NAV_ITEMS: { label: Page; icon: React.ElementType }[] = [
+  { label: "Today",    icon: LayoutDashboard },
+  { label: "All",      icon: List            },
+  { label: "Account",  icon: Users           },
+  { label: "Settings", icon: Settings        },
 ];
 
 function relativeTime(iso: string): string {
@@ -71,12 +81,16 @@ function Sidebar({
   onLogout,
   open,
   onClose,
+  currentPage,
+  onNavigate,
 }: {
   itemCount: number;
   doneCount: number;
   onLogout: () => void;
   open: boolean;
   onClose: () => void;
+  currentPage: Page;
+  onNavigate: (page: Page) => void;
 }) {
   const pct = itemCount > 0 ? Math.round((doneCount / itemCount) * 100) : 0;
 
@@ -139,24 +153,28 @@ function Sidebar({
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-3 space-y-0.5">
-          {NAV_ITEMS.map(({ label, icon: Icon, active }) => (
-            <button
-              key={label}
-              className={`group flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all ${
-                active
-                  ? "bg-[#2D2A26] text-white"
-                  : "text-[#7A7066] hover:bg-[#EDE8DF] hover:text-[#2D2A26]"
-              }`}
-            >
-              <Icon className={`w-4 h-4 shrink-0 ${active ? "opacity-100" : "opacity-60 group-hover:opacity-80"}`} />
-              <span className="flex-1 text-left">{label}</span>
-              {label === "All" && itemCount > 0 && (
-                <span className={`text-[10px] font-mono px-2 py-0.5 rounded-lg ${active ? "bg-white/20 text-white/80" : "bg-[#EDE8DF] text-[#7A7066]"}`}>
-                  {itemCount}
-                </span>
-              )}
-            </button>
-          ))}
+          {NAV_ITEMS.map(({ label, icon: Icon }) => {
+            const active = currentPage === label;
+            return (
+              <button
+                key={label}
+                onClick={() => { onNavigate(label); onClose(); }}
+                className={`group flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all ${
+                  active
+                    ? "bg-[#2D2A26] text-white"
+                    : "text-[#7A7066] hover:bg-[#EDE8DF] hover:text-[#2D2A26]"
+                }`}
+              >
+                <Icon className={`w-4 h-4 shrink-0 ${active ? "opacity-100" : "opacity-60 group-hover:opacity-80"}`} />
+                <span className="flex-1 text-left">{label}</span>
+                {label === "All" && itemCount > 0 && (
+                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded-lg ${active ? "bg-white/20 text-white/80" : "bg-[#EDE8DF] text-[#7A7066]"}`}>
+                    {itemCount}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </nav>
 
         {/* Stats strip */}
@@ -297,6 +315,7 @@ export default function DashboardPage() {
   const [saved,      setSaved]      = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [filter,     setFilter]     = useState<"all" | "active" | "done">("all");
+  const [currentPage, setCurrentPage] = useState<Page>("Today");
 
   useEffect(() => { fetchItems(); }, []);
 
@@ -319,8 +338,9 @@ export default function DashboardPage() {
     });
   }
 
-  function deleteLocal(id: string) {
+  async function deleteItem(id: string) {
     setItems(prev => prev.filter(i => i._id !== id));
+    await fetch(`/api/items/${id}`, { method: "DELETE" });
   }
 
   async function createItem() {
@@ -395,6 +415,8 @@ export default function DashboardPage() {
             onLogout={handleLogout}
             open={sidebarOpen}
             onClose={() => setSidebarOpen(false)}
+            currentPage={currentPage}
+            onNavigate={setCurrentPage}
           />
 
           {/* Main */}
@@ -412,7 +434,7 @@ export default function DashboardPage() {
                 </button>
                 <div>
                   <h1 className="text-[18px] font-black text-[#2D2A26] leading-tight">
-                    {greeting()} 👋
+                    {currentPage === "Today" ? `${greeting()} 👋` : currentPage}
                   </h1>
                   <p className="text-[11px] text-[#A89F94] hidden sm:block">
                     {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
@@ -435,152 +457,254 @@ export default function DashboardPage() {
             <div className="flex-1 overflow-y-auto pb-20 lg:pb-6">
               <div className="max-w-[780px] mx-auto px-4 sm:px-6 py-6 space-y-5">
 
-                {/* Add task card */}
-                <div className="bg-white rounded-2xl border border-[#EDE8DF] overflow-hidden shadow-sm">
-                  <div className="px-5 py-4 border-b border-[#EDE8DF] flex items-center justify-between">
-                    <p className="text-[14px] font-bold text-[#2D2A26]">New task</p>
-                    <Badge
-                      variant="outline"
-                      className="mono text-[10px] font-medium text-amber-600 bg-amber-50 border-amber-200 px-2 py-0.5 rounded-lg"
-                    >
-                      POST /api/items
-                    </Badge>
-                  </div>
+                {/* ── TODAY PAGE ── */}
+                {(currentPage === "Today" || currentPage === "All") && (
+                  <>
+                    {/* Add task card — only on Today */}
+                    {currentPage === "Today" && (
+                      <div className="bg-white rounded-2xl border border-[#EDE8DF] overflow-hidden shadow-sm">
+                        <div className="px-5 py-4 border-b border-[#EDE8DF] flex items-center justify-between">
+                          <p className="text-[14px] font-bold text-[#2D2A26]">New task</p>
+                          <Badge variant="outline" className="mono text-[10px] font-medium text-amber-600 bg-amber-50 border-amber-200 px-2 py-0.5 rounded-lg">
+                            POST /api/items
+                          </Badge>
+                        </div>
+                        <div className="px-5 py-4 space-y-3">
+                          <Input
+                            placeholder="What do you need to do?"
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && createItem()}
+                            className="h-11 border-[#EDE8DF] bg-[#FDFAF6] text-[#2D2A26] placeholder:text-[#C8C0B6] rounded-xl text-[14px]"
+                          />
+                          <Textarea
+                            placeholder="Add a note… (optional)"
+                            value={desc}
+                            onChange={(e) => setDesc(e.target.value)}
+                            className="resize-none h-[72px] border-[#EDE8DF] bg-[#FDFAF6] text-[#2D2A26] placeholder:text-[#C8C0B6] rounded-xl text-[13px]"
+                          />
+                          <button
+                            onClick={createItem}
+                            disabled={saving || !title.trim()}
+                            className={`w-full h-11 rounded-xl flex items-center justify-center gap-2 text-[14px] font-bold transition-all duration-150 disabled:opacity-40 active:scale-[0.98] ${
+                              saved ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : saving ? "bg-[#EDE8DF] text-[#A89F94]"
+                              : "bg-[#2D2A26] text-white hover:bg-[#1a1916]"
+                            }`}
+                          >
+                            {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Adding…</>
+                              : saved ? <><CheckCircle2 className="w-4 h-4" /> Task added!</>
+                              : <><Plus className="w-4 h-4" /> Add task</>}
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
-                  <div className="px-5 py-4 space-y-3">
-                    <Input
-                      placeholder="What do you need to do?"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && createItem()}
-                      className="h-11 border-[#EDE8DF] bg-[#FDFAF6] text-[#2D2A26] placeholder:text-[#C8C0B6] rounded-xl text-[14px]"
-                    />
-                    <Textarea
-                      placeholder="Add a note… (optional)"
-                      value={desc}
-                      onChange={(e) => setDesc(e.target.value)}
-                      className="resize-none h-[72px] border-[#EDE8DF] bg-[#FDFAF6] text-[#2D2A26] placeholder:text-[#C8C0B6] rounded-xl text-[13px]"
-                    />
-                    <button
-                      onClick={createItem}
-                      disabled={saving || !title.trim()}
-                      className={`w-full h-11 rounded-xl flex items-center justify-center gap-2 text-[14px] font-bold transition-all duration-150 disabled:opacity-40 active:scale-[0.98] ${
-                        saved
-                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                          : saving
-                          ? "bg-[#EDE8DF] text-[#A89F94]"
-                          : "bg-[#2D2A26] text-white hover:bg-[#1a1916]"
-                      }`}
-                    >
-                      {saving ? (
-                        <><Loader2 className="w-4 h-4 animate-spin" /> Adding…</>
-                      ) : saved ? (
-                        <><CheckCircle2 className="w-4 h-4" /> Task added!</>
-                      ) : (
-                        <><Plus className="w-4 h-4" /> Add task</>
-                      )}
-                    </button>
-                  </div>
-                </div>
+                    {/* Tasks list card */}
+                    <div className="bg-white rounded-2xl border border-[#EDE8DF] overflow-hidden shadow-sm">
+                      {/* Filter tabs */}
+                      <div className="px-4 border-b border-[#EDE8DF] flex items-center gap-1">
+                        {(["all", "active", "done"] as const).map((f) => (
+                          <button
+                            key={f}
+                            onClick={() => setFilter(f)}
+                            className={`filter-tab ${filter === f ? "active" : ""} px-3 py-3.5 text-[12px] font-semibold capitalize transition-colors ${
+                              filter === f ? "text-[#2D2A26]" : "text-[#A89F94] hover:text-[#7A7066]"
+                            }`}
+                          >
+                            {f}
+                            {f === "active" && items.filter(i => !i.done).length > 0 && (
+                              <span className="ml-1.5 text-[10px] mono bg-[#F7F3EE] text-[#7A7066] px-1.5 py-0.5 rounded-md">
+                                {items.filter(i => !i.done).length}
+                              </span>
+                            )}
+                            {f === "done" && doneCount > 0 && (
+                              <span className="ml-1.5 text-[10px] mono bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-md">
+                                {doneCount}
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                        <div className="ml-auto">
+                          <Badge variant="outline" className="mono text-[10px] font-medium text-[#A89F94] bg-[#FDFAF6] border-[#EDE8DF] px-2 py-0.5 rounded-lg">
+                            GET /api/items
+                          </Badge>
+                        </div>
+                      </div>
 
-                {/* Tasks list card */}
-                <div className="bg-white rounded-2xl border border-[#EDE8DF] overflow-hidden shadow-sm">
-                  {/* Filter tabs */}
-                  <div className="px-4 border-b border-[#EDE8DF] flex items-center gap-1">
-                    {(["all", "active", "done"] as const).map((f) => (
-                      <button
-                        key={f}
-                        onClick={() => setFilter(f)}
-                        className={`filter-tab ${filter === f ? "active" : ""} px-3 py-3.5 text-[12px] font-semibold capitalize transition-colors ${
-                          filter === f ? "text-[#2D2A26]" : "text-[#A89F94] hover:text-[#7A7066]"
-                        }`}
-                      >
-                        {f}
-                        {f === "active" && items.filter(i => !i.done).length > 0 && (
-                          <span className="ml-1.5 text-[10px] mono bg-[#F7F3EE] text-[#7A7066] px-1.5 py-0.5 rounded-md">
-                            {items.filter(i => !i.done).length}
-                          </span>
-                        )}
-                        {f === "done" && doneCount > 0 && (
-                          <span className="ml-1.5 text-[10px] mono bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-md">
-                            {doneCount}
-                          </span>
-                        )}
-                      </button>
-                    ))}
-                    <div className="ml-auto">
-                      <Badge
-                        variant="outline"
-                        className="mono text-[10px] font-medium text-[#A89F94] bg-[#FDFAF6] border-[#EDE8DF] px-2 py-0.5 rounded-lg"
-                      >
-                        GET /api/items
-                      </Badge>
-                    </div>
-                  </div>
-
-                  {/* List */}
-                  <div className="py-1">
-                    {loading ? (
-                      <div className="space-y-1 p-2">
-                        {[1,2,3].map((i) => (
-                          <div key={i} className="flex items-center gap-3.5 px-4 py-4 animate-pulse">
-                            <div className="w-5 h-5 rounded bg-[#EDE8DF] shrink-0" />
-                            <div className="flex-1 space-y-2">
-                              <div className="h-3 w-3/5 rounded-full bg-[#EDE8DF]" />
-                              <div className="h-2.5 w-2/5 rounded-full bg-[#F7F3EE]" />
+                      {/* List */}
+                      <div className="py-1">
+                        {loading ? (
+                          <div className="space-y-1 p-2">
+                            {[1,2,3].map((i) => (
+                              <div key={i} className="flex items-center gap-3.5 px-4 py-4 animate-pulse">
+                                <div className="w-5 h-5 rounded bg-[#EDE8DF] shrink-0" />
+                                <div className="flex-1 space-y-2">
+                                  <div className="h-3 w-3/5 rounded-full bg-[#EDE8DF]" />
+                                  <div className="h-2.5 w-2/5 rounded-full bg-[#F7F3EE]" />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : filtered.length === 0 ? (
+                          <div className="py-16 flex flex-col items-center gap-3">
+                            <div className="w-14 h-14 rounded-2xl bg-[#F7F3EE] border border-[#EDE8DF] flex items-center justify-center">
+                              {filter === "done" ? <CheckCircle2 className="w-6 h-6 text-[#C8C0B6]" /> : <Circle className="w-6 h-6 text-[#C8C0B6]" />}
                             </div>
+                            <div className="text-center">
+                              <p className="text-[14px] font-bold text-[#A89F94]">
+                                {filter === "done" ? "Nothing completed yet" : "You're all caught up!"}
+                              </p>
+                              <p className="text-[12px] text-[#C8C0B6] mt-1">
+                                {filter === "active" ? "Add a new task above" : filter === "done" ? "Complete a task to see it here" : "Add your first task above ↑"}
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="divide-y divide-[#F7F3EE]">
+                            {filtered.map((item, i) => (
+                              <TodoItem key={item._id} item={item} index={i} onToggle={toggleDone} onDelete={deleteItem} />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Footer summary */}
+                      {!loading && items.length > 0 && (
+                        <div className="px-5 py-3 bg-[#FDFAF6] border-t border-[#EDE8DF] flex items-center justify-between">
+                          <p className="text-[11px] text-[#A89F94] mono">{items.filter(i => !i.done).length} remaining</p>
+                          {doneCount > 0 && (
+                            <button
+                              onClick={() => setItems(prev => prev.filter(i => !i.done))}
+                              className="text-[11px] text-[#A89F94] hover:text-red-400 transition-colors font-semibold"
+                            >
+                              Clear done
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* ── ACCOUNT PAGE ── */}
+                {currentPage === "Account" && (
+                  <div className="space-y-4">
+                    <div className="bg-white rounded-2xl border border-[#EDE8DF] overflow-hidden shadow-sm">
+                      <div className="px-5 py-4 border-b border-[#EDE8DF]">
+                        <p className="text-[14px] font-bold text-[#2D2A26]">Account</p>
+                      </div>
+                      <div className="px-5 py-6 flex flex-col items-center gap-4">
+                        <div className="w-16 h-16 rounded-full bg-[#2D2A26] flex items-center justify-center text-[22px] font-bold text-[#F5C97A]">
+                          S
+                        </div>
+                        <div className="text-center">
+                          <p className="text-[16px] font-bold text-[#2D2A26]">Demo Student</p>
+                          <p className="text-[12px] text-[#A89F94] mono mt-0.5">demo-001</p>
+                        </div>
+                      </div>
+                      <div className="border-t border-[#EDE8DF] divide-y divide-[#F7F3EE]">
+                        {[
+                          { icon: Mail,      label: "Email",   value: "student@example.com" },
+                          { icon: KeyRound,  label: "User ID", value: "demo-001"            },
+                          { icon: ShieldCheck, label: "Auth",  value: "JWT · HttpOnly cookie" },
+                          { icon: DatabaseZap, label: "Database", value: "MongoDB Atlas · todowebapp" },
+                        ].map(({ icon: Icon, label, value }) => (
+                          <div key={label} className="flex items-center gap-3 px-5 py-3.5">
+                            <Icon className="w-4 h-4 text-[#A89F94] shrink-0" />
+                            <span className="text-[12px] text-[#7A7066] w-24 shrink-0">{label}</span>
+                            <span className="text-[12px] font-semibold text-[#2D2A26] mono truncate">{value}</span>
                           </div>
                         ))}
                       </div>
-                    ) : filtered.length === 0 ? (
-                      <div className="py-16 flex flex-col items-center gap-3">
-                        <div className="w-14 h-14 rounded-2xl bg-[#F7F3EE] border border-[#EDE8DF] flex items-center justify-center">
-                          {filter === "done"
-                            ? <CheckCircle2 className="w-6 h-6 text-[#C8C0B6]" />
-                            : <Circle className="w-6 h-6 text-[#C8C0B6]" />
-                          }
-                        </div>
-                        <div className="text-center">
-                          <p className="text-[14px] font-bold text-[#A89F94]">
-                            {filter === "done" ? "Nothing completed yet" : "You're all caught up!"}
-                          </p>
-                          <p className="text-[12px] text-[#C8C0B6] mt-1">
-                            {filter === "active" ? "Add a new task above" : filter === "done" ? "Complete a task to see it here" : "Add your first task above ↑"}
-                          </p>
-                        </div>
+                    </div>
+                    <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4">
+                      <div className="flex gap-3">
+                        <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                        <p className="text-[12px] text-amber-700 leading-relaxed">
+                          This is a demo account with hardcoded credentials. In a real app, account management would include profile editing, password change, and session history.
+                        </p>
                       </div>
-                    ) : (
+                    </div>
+                  </div>
+                )}
+
+                {/* ── SETTINGS PAGE ── */}
+                {currentPage === "Settings" && (
+                  <div className="space-y-4">
+                    <div className="bg-white rounded-2xl border border-[#EDE8DF] overflow-hidden shadow-sm">
+                      <div className="px-5 py-4 border-b border-[#EDE8DF]">
+                        <p className="text-[14px] font-bold text-[#2D2A26]">Settings</p>
+                      </div>
                       <div className="divide-y divide-[#F7F3EE]">
-                        {filtered.map((item, i) => (
-                          <TodoItem
-                            key={item._id}
-                            item={item}
-                            index={i}
-                            onToggle={toggleDone}
-                            onDelete={deleteLocal}
-                          />
+
+                        {/* Clear completed */}
+                        <div className="flex items-center justify-between px-5 py-4">
+                          <div className="flex items-center gap-3">
+                            <Eraser className="w-4 h-4 text-[#A89F94]" />
+                            <div>
+                              <p className="text-[13px] font-semibold text-[#2D2A26]">Clear completed tasks</p>
+                              <p className="text-[11px] text-[#A89F94] mt-0.5">Remove all done tasks from the list</p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setItems(prev => prev.filter(i => !i.done))}
+                            disabled={doneCount === 0}
+                            className="text-[12px] font-semibold px-3 py-1.5 rounded-lg bg-[#F7F3EE] text-[#7A7066] hover:bg-red-50 hover:text-red-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                          >
+                            Clear {doneCount > 0 ? `(${doneCount})` : ""}
+                          </button>
+                        </div>
+
+                        {/* Notifications placeholder */}
+                        <div className="flex items-center justify-between px-5 py-4">
+                          <div className="flex items-center gap-3">
+                            <BellOff className="w-4 h-4 text-[#A89F94]" />
+                            <div>
+                              <p className="text-[13px] font-semibold text-[#2D2A26]">Notifications</p>
+                              <p className="text-[11px] text-[#A89F94] mt-0.5">Currently disabled in demo mode</p>
+                            </div>
+                          </div>
+                          <span className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-[#F7F3EE] text-[#A89F94]">Off</span>
+                        </div>
+
+                        {/* Theme placeholder */}
+                        <div className="flex items-center justify-between px-5 py-4">
+                          <div className="flex items-center gap-3">
+                            <Palette className="w-4 h-4 text-[#A89F94]" />
+                            <div>
+                              <p className="text-[13px] font-semibold text-[#2D2A26]">Theme</p>
+                              <p className="text-[11px] text-[#A89F94] mt-0.5">Light mode active</p>
+                            </div>
+                          </div>
+                          <span className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-[#F7F3EE] text-[#A89F94]">Light</span>
+                        </div>
+
+                      </div>
+                    </div>
+
+                    {/* App info */}
+                    <div className="bg-white rounded-2xl border border-[#EDE8DF] overflow-hidden shadow-sm">
+                      <div className="px-5 py-4 border-b border-[#EDE8DF]">
+                        <p className="text-[14px] font-bold text-[#2D2A26]">App info</p>
+                      </div>
+                      <div className="divide-y divide-[#F7F3EE]">
+                        {[
+                          { label: "Framework",  value: "Next.js 16"       },
+                          { label: "Database",   value: "MongoDB Atlas"    },
+                          { label: "Auth",       value: "JWT middleware"   },
+                          { label: "Styling",    value: "Tailwind CSS v4"  },
+                          { label: "Deployment", value: "Vercel"           },
+                        ].map(({ label, value }) => (
+                          <div key={label} className="flex items-center justify-between px-5 py-3">
+                            <span className="text-[12px] text-[#7A7066]">{label}</span>
+                            <span className="text-[12px] font-semibold text-[#2D2A26] mono">{value}</span>
+                          </div>
                         ))}
                       </div>
-                    )}
-                  </div>
-
-                  {/* Footer summary */}
-                  {!loading && items.length > 0 && (
-                    <div className="px-5 py-3 bg-[#FDFAF6] border-t border-[#EDE8DF] flex items-center justify-between">
-                      <p className="text-[11px] text-[#A89F94] mono">
-                        {items.filter(i => !i.done).length} remaining
-                      </p>
-                      {doneCount > 0 && (
-                        <button
-                          onClick={() => setItems(prev => prev.filter(i => !i.done))}
-                          className="text-[11px] text-[#A89F94] hover:text-red-400 transition-colors font-semibold"
-                        >
-                          Clear done
-                        </button>
-                      )}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
               </div>
             </div>
